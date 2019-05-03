@@ -1,29 +1,35 @@
 #!/usr/bin/env node
+const fs = require('fs');
+const path = require('path');
 const {promisify} = require('util');
 
 const ora = require('ora');
 const error = require('serialize-error');
-const glob = promisify(require('glob'));
+
+const transform = require('./transform');
 
 (async function run() {
   const status = ora();
 
+  const cwd = process.cwd();
+  const resolve = (...args) => path.resolve(...[cwd, ...args]);
+
   try {
     status.start('Start');
 
-    const cwd = process.cwd();
-    const [pattern] = process.argv.slice(2);
-    const files = await glob(pattern, {cwd});
-
-    for (const file of files) {
-      status.text = file;
-      await new Promise(r => setTimeout(r, 1e3));
+    const [input] = process.argv.slice(2);
+    if (!input) {
+      throw new Error('You need to pass the `input` filename as an argument');
     }
 
-    status.succeed('Done');
+    const body = await promisify(fs.readFile)(resolve(input), 'utf8');
+
+    const output = transform(body);
+
+    status.succeed(output);
     process.exit(0);
   } catch (err) {
-    status.fail(error(err));
+    status.fail(error(err).message);
     process.exit(1);
   }
 })();
